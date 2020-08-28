@@ -1,0 +1,116 @@
+---
+title: "Activity monitoring data analysis"
+author: "Victor A. Kibisu"
+date: "8/28/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### loading the dataset and processing the data
+```{r}
+library(tidyverse)
+activity <- read_csv("activity.csv")
+```
+
+### What is the mean total number of steps taken per day?
+```{r warning=FALSE}
+#plot the total number of steps each day 
+clean_activity <- activity[!is.na(activity$steps),]
+total_steps <- tapply(clean_activity$steps, clean_activity$date, sum, na.rm = TRUE)
+total_steps <- as.data.frame(total_steps)
+ggplot(total_steps, aes(total_steps))+
+  geom_histogram(fill = "blue", bins = 20)+
+  labs(title = "Total number of steps each day",
+       x = "Steps",
+       y = "total number of steps")+
+  theme_gray()
+```
+
+
+```{r warning=FALSE}
+# calculating the mean and median of the steps taken each day
+total_steps %>% summarise(
+  mean_steps = mean(total_steps),
+  med_steps = median(total_steps)
+)
+```
+The mean total number of steps taken per day is 10766.19
+
+### What is the average daily activity pattern?
+```{r}
+library(plyr)
+daily_average <- ddply(clean_activity, .(interval), summarise, Average = mean(steps))
+daily_average %>% ggplot(aes(interval, Average))+geom_line()+
+  labs(title = "Average daily activity",
+       x = "Interval",
+       y = "average number of steps")
+
+
+```
+
+```{r}
+# which interval contains maximum number of steps
+max_steps <- max(daily_average$Average)
+daily_average[daily_average$Average == max_steps,1]
+```
+the interval that had maximum number of steps is 835
+
+### Imputing missing values
+```{r}
+colSums(is.na(activity))
+```
+There are 2304 missing values in the steps variable
+```{r}
+# loading the naniar package for the imputation
+library(naniar)
+#we use the impute_mean function from naniar package to do the imputation
+activity$steps<- activity$steps %>% impute_mean()
+
+
+```
+
+```{r}
+# making a histogram of the imputed data
+total_imputed_steps <- ddply(activity, .(date), summarise, total = sum(steps))
+total_imputed_steps %>% 
+  ggplot(aes(total))+
+  geom_histogram(bins = 20, fill ="blue")
+```
+
+```{r}
+#calculate the mean and median
+total_imputed_steps %>% 
+  summarise(mean_df = mean(total),
+            med_df = median(total))
+```
+
+From the analysis the values do not defer too much from the previous estimates of mean and median. There was no great impact of imputing the values since our estimates just remained the same.
+
+
+### Are there differences in activity patterns between weekdays and weekends
+```{r}
+
+activity$day <- weekdays(as.Date(activity$date))
+activity <- activity %>% 
+  mutate(days = ifelse(day %in% c("Saturday","Sunday"), "weekend","weekday" ))
+activity$days <- as.factor(activity$days)
+
+
+```
+
+```{r}
+# create a panel plot
+weekly_average <- ddply(activity, .(interval, days), summarise, Average = mean(steps))
+weekly_average %>% ggplot(aes(interval, Average))+geom_line()+
+  labs(title = "Average weekly activity",
+       x = "Interval",
+       y = "average number of steps")+
+  facet_grid(days~.)
+
+
+```
+
+There are some differences between the weekdays and weekends as we can see how there is sharp peek in the weekdays as compared to the weekend.
